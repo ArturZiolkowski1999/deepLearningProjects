@@ -12,6 +12,7 @@ import numpy as np
 from keras import layers
 from keras import models
 from keras.preprocessing import image
+from keras.layers.advanced_activations import LeakyReLU
 from sklearn import preprocessing
 
 os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
@@ -32,25 +33,42 @@ img_shape = (img_rows, img_cols, channels)
 ##########################################################################
 # Given input of noise (latent) vector, the Generator produces an image.
 def build_generator():
-
+    noise_shape = (512,)
     # Define your generator network
     # Here we are only using Dense layers. But network can be complicated based
     # on the application. For example, you can use VGG for super res. GAN.
     model = models.Sequential()
-    model.add(layers.Conv2D(64, (2, 2), activation='relu', input_shape=img_shape, padding="same"))
-    model.add(layers.MaxPooling2D(2, 2))
-    model.add(layers.Conv2D(128, (2, 2), activation='relu', padding="same"))
-    model.add(layers.MaxPooling2D(2, 2))
-    model.add(layers.Conv2D(128, (2, 2), activation='relu', padding="same"))
-    model.add(layers.MaxPooling2D(2, 2))
-    model.add(layers.Flatten())
-    model.add(layers.Dropout(0.5))
-    model.add(Dense(np.prod(img_shape), activation='relu'))
+    model.add(Dense(512, input_shape=noise_shape))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(BatchNormalization(momentum=0.8))
+    model.add(Dense(1024))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Reshape((16, 16, 4)))
+    model.add(layers.Conv2D(512, (2, 2), activation='relu', padding="same"))
+    model.add(BatchNormalization(momentum=0.8))
+    model.add(Dense(1024))
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(BatchNormalization(momentum=0.8))
+
+    model.add(Dense(12, activation='tanh'))
     model.add(Reshape(img_shape))
+
+
+    # model = models.Sequential()
+    # model.add(layers.Conv2D(64, (2, 2), activation='relu', input_shape=img_shape, padding="same"))
+    # model.add(layers.MaxPooling2D(2, 2))
+    # model.add(layers.Conv2D(128, (2, 2), activation='relu', padding="same"))
+    # model.add(layers.MaxPooling2D(2, 2))
+    # model.add(layers.Conv2D(128, (2, 2), activation='relu', padding="same"))
+    # model.add(layers.MaxPooling2D(2, 2))
+    # model.add(layers.Flatten())
+    # model.add(layers.Dropout(0.5))
+    # model.add(Dense(np.prod(img_shape), activation='relu'))
+    # model.add(Reshape(img_shape))
 
     model.summary()
 
-    noise = Input(shape=img_shape)
+    noise = Input(shape=noise_shape)
     img = model(noise)  # Generated image
 
     return Model(noise, img)
@@ -124,7 +142,7 @@ def train(epochs, batch_size=32, save_interval=50):
 
         # Select a random half batch of real images
 
-        noise = np.random.normal(0, 1, (half_batch, img_rows, img_cols, 3))
+        noise = np.random.normal(0, 1, (half_batch, 512))
 
         # Generate a half batch of fake images
         gen_imgs = generator.predict(noise)
@@ -146,7 +164,7 @@ def train(epochs, batch_size=32, save_interval=50):
         # Create noise vectors as input for generator.
         # Create as many noise vectors as defined by the batch size.
         # Based on normal distribution. Output will be of size (batch size, 1000)
-        noise = np.random.normal(0, 1, (batch_size, img_rows, img_cols, 3))
+        noise = np.random.normal(0, 1, (batch_size, 512))
 
         # The generator wants the discriminator to label the generated samples
         # as valid (ones)
@@ -176,7 +194,7 @@ def train(epochs, batch_size=32, save_interval=50):
 
 def save_imgs(epoch):
     r, c = 5, 5
-    noise = np.random.normal(0, 1, (r * c, img_rows, img_cols, 3))
+    noise = np.random.normal(0, 1, (r * c, 512))
     #normalize pictures
     gen_imgs = generator.predict(noise)
     gen_imgs /= gen_imgs.max()
@@ -226,7 +244,7 @@ generator.compile(loss='binary_crossentropy', optimizer=optimizer)
 
 ##This builds the Generator and defines the input noise.
 # In a GAN the Generator network takes noise z as an input to produce its images.
-z = Input(shape=img_shape)  # Our random input to the generator
+z = Input(shape=(512,))  # Our random input to the generator
 img = generator(z)
 
 # This ensures that when we combine our networks we only train the Generator.
@@ -248,7 +266,7 @@ valid = discriminator(img)  # Validity check on the generated image
 combined = Model(z, valid)
 combined.compile(loss='binary_crossentropy', optimizer=optimizer)
 
-train(epochs=200000, batch_size=24, save_interval=10)
+train(epochs=20000, batch_size=24, save_interval=10)
 
 # Save model for future use to generate fake images
 # Not tested yet... make sure right model is being saved..
