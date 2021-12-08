@@ -33,11 +33,13 @@ img_shape = (img_rows, img_cols, channels)
 ##########################################################################
 # Given input of noise (latent) vector, the Generator produces an image.
 def build_generator():
-    noise_shape = (500,)
+    noise_shape = (
+        512,)
     # Define your generator network
     # Here we are only using Dense layers. But network can be complicated based
     # on the application. For example, you can use VGG for super res. GAN.
-    model = models.Sequential()
+    model = Sequential()
+
     model.add(Dense(256, input_shape=noise_shape))
     model.add(LeakyReLU(alpha=0.2))
     model.add(BatchNormalization(momentum=0.8))
@@ -47,9 +49,10 @@ def build_generator():
     model.add(Dense(1024))
     model.add(LeakyReLU(alpha=0.2))
     model.add(BatchNormalization(momentum=0.8))
-
-    model.add(Dense(3072, activation='tanh'))
+    model.add(Dense(np.prod(img_shape), activation='tanh'))
     model.add(Reshape(img_shape))
+
+    model.summary()
 
 
     # model = models.Sequential()
@@ -121,10 +124,10 @@ def train(epochs, batch_size=32, save_interval=50):
 
         for i in range(half_batch):
 
-            if((epoch+1)*i) < 7218:
+            if((epoch+1)*i) < 202598:
                 fname_human = os.path.join(humans_dir, os.listdir(humans_dir)[(epoch+1)*i])
             else:
-                index = random.randint(0, 7218)
+                index = random.randint(0, 202598)
                 fname_human = os.path.join(humans_dir, os.listdir(humans_dir)[index])
 
             img_human = image.load_img(fname_human, target_size=(img_rows, img_cols))
@@ -140,7 +143,7 @@ def train(epochs, batch_size=32, save_interval=50):
 
         # Select a random half batch of real images
 
-        noise = np.random.normal(0, 1, (half_batch, 500))
+        noise = np.random.normal(0, 1, (half_batch, 512))
 
         # Generate a half batch of fake images
         gen_imgs = generator.predict(noise)
@@ -162,7 +165,7 @@ def train(epochs, batch_size=32, save_interval=50):
         # Create noise vectors as input for generator.
         # Create as many noise vectors as defined by the batch size.
         # Based on normal distribution. Output will be of size (batch size, 1000)
-        noise = np.random.normal(0, 1, (batch_size, 500))
+        noise = np.random.normal(0, 1, (batch_size, 512))
 
         # The generator wants the discriminator to label the generated samples
         # as valid (ones)
@@ -192,7 +195,7 @@ def train(epochs, batch_size=32, save_interval=50):
 
 def save_imgs(epoch):
     r, c = 5, 5
-    noise = np.random.normal(0, 1, (r * c, 500))
+    noise = np.random.normal(0, 1, (r * c, 512))
     #normalize pictures
     gen_imgs = generator.predict(noise)
     gen_imgs /= gen_imgs.max()
@@ -242,7 +245,7 @@ generator.compile(loss='binary_crossentropy', optimizer=optimizer)
 
 ##This builds the Generator and defines the input noise.
 # In a GAN the Generator network takes noise z as an input to produce its images.
-z = Input(shape=(500,))  # Our random input to the generator
+z = Input(shape=(512,))  # Our random input to the generator
 img = generator(z)
 
 # This ensures that when we combine our networks we only train the Generator.
@@ -264,13 +267,13 @@ valid = discriminator(img)  # Validity check on the generated image
 combined = Model(z, valid)
 combined.compile(loss='binary_crossentropy', optimizer=optimizer)
 
-train(epochs=20000, batch_size=24, save_interval=200)
+train(epochs=100000, batch_size=24, save_interval=100)
 
 # Save model for future use to generate fake images
 # Not tested yet... make sure right model is being saved..
 # Compare with GAN4
 
-generator.save('HumansGAN_v1.h51')  # Test the model on GAN4_predict...
+generator.save('HumansGAN_v2_dense_.h51')  # Test the model on GAN4_predict...
 
 # Change epochs back to 30K
 
